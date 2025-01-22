@@ -1,0 +1,10 @@
+mama-venv/*
+dockerfile
+install.sh
+schema.drawio
+test_nb.ipynb
+dummy-data/*.pdf
+dummy-data-json/*.json
+dummy-data-xlsx/*.xlsx
+tmp/*
+test/*
