@@ -1,8 +1,17 @@
+import time
+
 from langchain_community.llms.ollama import Ollama
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 import streamlit as st
+
+
+def response_generator(response):
+    for word in response.split():
+        yield word + " "
+        time.sleep(0.05)
+
 
 class Generator():
     def __init__(self, retriever, model_local):
@@ -47,11 +56,38 @@ class Generator():
 if __name__ == "__main__":
     # Streamlit UI setup
     st.title("Document Query with Ollama")
-    question = st.text_input("Enter your question")
-    print(question)
 
-    # Button to process input
-    if st.button('Query Documents'):
-        with st.spinner('Processing...'):
-            answer = st.session_state['orchestrator'].generator.get_answer(str(question))
-            st.text_area("Answer", value=answer, height=300, disabled=True)  # Input fields
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Display chat messages from history on app rerun
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    while st.session_state['orchestrator'] is None:
+        pass
+
+
+    #prompt = st.chat_input("Enter your question")
+
+
+    # React to user input
+    if prompt := st.chat_input("Enter your question"):
+        print(prompt)
+        # Display user message in chat message container
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+
+        response = st.session_state['orchestrator'].generator.get_answer(str(prompt))
+
+        # Display assistant response in chat message container
+        with st.chat_message("assistant"):
+            #st.markdown(response)
+            response = st.write_stream(response_generator(response))
+        # Add assistant response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
