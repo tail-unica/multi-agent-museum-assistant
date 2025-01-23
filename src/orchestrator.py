@@ -1,5 +1,7 @@
 import sys
 sys.path.append('src/agents')
+import whisper
+from TTS.api import TTS
 from init_questions_multilanguage import init_questions
 from src.agents.retriever import Retriever
 from src.agents.profiling import get_user_info
@@ -29,6 +31,12 @@ class Orchestrator():
         print("loading orchestrator")
         self.retriever = Retriever(cfg.urls, cfg.local_docs, cfg.embedding_model)
         self.generator = Generator(self.retriever, cfg.model_local)
+        self.tts = TTS('tts_models/en/ljspeech/glow-tts').to("cuda:0") #'tts_models/en/ljspeech/glow-tts' tts_models/it/mai_male/glow-tts
+        self.stt = whisper.load_model("small", device="cpu")#None
+
+    def text_to_speech(self, text):
+        self.tts.say(text)
+        self.tts.runAndWait()
 
     def reset_session(self):
         st.session_state['knowledge'] = ""
