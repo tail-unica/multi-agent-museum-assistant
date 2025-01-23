@@ -1,6 +1,6 @@
 import sys
 sys.path.append('src/agents')
-
+from init_questions_multilanguage import init_questions
 from src.agents.retriever import Retriever
 from src.agents.profiling import get_user_info
 from src.agents.generation import Generator
@@ -49,12 +49,12 @@ def start_session(session_state):
                          **chroma_db_config)
 
     option = st.selectbox(
-        "Choose your Language",
+        "Scegli la tua lingua / Choose your Language / Choisissez votre langue / Wählen Sie Ihre Sprache",
         ("Italian", "English", "French", "German"),
     )
 
     session_state['language'] = option
-    st.write("You selected:", option)
+    #st.write("You selected:", option)
 
     # orchestrator = Orchestrator()
 

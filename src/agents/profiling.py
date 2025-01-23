@@ -1,26 +1,27 @@
 import streamlit as st
-
+from init_questions_multilanguage import init_questions
 
 def get_user_info():
     # Streamlit UI setup
-    st.title("User Information (Anonymous)")
-    st.write("How much do you know about sardinian history?")
+    st.title(init_questions[st.session_state['language']]["userinfo"])
+
 
     # Input fields
 
     knowledge = st.selectbox(
-        "Enter your level of knowledge about sardinian history ",
-        ("Low", "Medium", "High"),
+        init_questions[st.session_state['language']]["knowledge level"],
+        init_questions[st.session_state['language']]["knowledge_settings"],
     )
     age = st.selectbox(
-        "Which age group do you belong to?",
+        init_questions[st.session_state['language']]["age"],
         ("<15", "15-23", "23-30", "30-45", ">50"),
     )
 
+    kd_idx = init_questions[st.session_state['language']]["knowledge_settings"].index(knowledge)
     # Button to process input
     if st.button('Send Data'):
         # with st.spinner('Processing...'):
-        st.session_state['knowledge'] = knowledge
+        st.session_state['knowledge'] = init_questions['English']["knowledge_settings"][kd_idx]
         st.session_state['age'] = age
         st.session_state['load_orch_thrd'].join()
         st.session_state['orchestrator'].generator.set_rag_template(st.session_state)

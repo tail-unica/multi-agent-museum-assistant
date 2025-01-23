@@ -5,7 +5,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 import streamlit as st
-
+from init_questions_multilanguage import init_questions
 
 def response_generator(response):
     for word in response.split():
@@ -55,39 +55,35 @@ class Generator():
 
 if __name__ == "__main__":
     # Streamlit UI setup
-    st.title("Document Query with Ollama")
+    if 'orchestrator' in st.session_state:
 
-    # Initialize chat history
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+        st.title(init_questions[st.session_state['language']]["title"])
 
-    # Display chat messages from history on app rerun
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+        # Initialize chat history
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
 
-    while st.session_state['orchestrator'] is None:
-        pass
-
-
-    #prompt = st.chat_input("Enter your question")
+        # Display chat messages from history on app rerun
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
 
-    # React to user input
-    if prompt := st.chat_input("Enter your question"):
-        print(prompt)
-        # Display user message in chat message container
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        # React to user input
+        if prompt := st.chat_input(init_questions[st.session_state['language']]["query template"]):
+            print(prompt)
+            # Display user message in chat message container
+            with st.chat_message("user"):
+                st.markdown(prompt)
+            # Add user message to chat history
+            st.session_state.messages.append({"role": "user", "content": prompt})
 
-        response = st.session_state['orchestrator'].generator.get_answer(str(prompt))
+            response = st.session_state['orchestrator'].generator.get_answer(str(prompt))
 
-        # Display assistant response in chat message container
-        with st.chat_message("assistant"):
-            #st.markdown(response)
-            response = st.write_stream(response_generator(response))
-        # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": response})
+            # Display assistant response in chat message container
+            with st.chat_message("assistant"):
+                #st.markdown(response)
+                response = st.write_stream(response_generator(response))
+            # Add assistant response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": response})
 
