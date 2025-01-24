@@ -1,5 +1,7 @@
+import gc
 import time
 
+import torch
 from langchain_community.llms.ollama import Ollama
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -11,6 +13,12 @@ from init_questions_multilanguage import init_questions
 import whisper
 import pyttsx3
 
+languages = {
+    "English": "en",
+    "French": "fr",
+    "Italian": "it",
+    "German": "de"
+}
 
 def response_generator(response):
     for word in response.split():
@@ -44,18 +52,33 @@ class Generator():
         )
         return after_rag_chain.invoke(question)
 
-    def set_rag_template(self, user_data):
-        if user_data["age"] != "" and user_data["knowledge"] != "":
-            self.user_data = user_data
-            self.after_rag_template = """You are a local guide at the CIMA museum, and it is your duty to provide enjoyable and complete answers to the visitors.
+    def format_history(self, history):
+        if history == "None":
+            return ""
+        hst = ""
+        msg = history[-1]
+        s = f"{msg['role']}: {msg['content']}\n"
+        hst += s
+        return hst
+
+    def set_rag_template(self, history = "None"):
+
+        self.after_rag_template = """You are a local guide at the CIMA museum, and it is your duty to provide enjoyable and complete answers to the visitors, using only words that are easy to translate in other languages.
             Answer the question based only on the following context:
         {context}. If the question does not match the context, just say that you don't know or that is not related to the museum. 
-        Provide very insightful answers, including all you know about the question and possible related contents. Do not mention the documents you read, just say all you know as if it was your knowledge
+        Otherwise, provide very insightful answers, including all you know about the question and possible related contents. Do not mention the documents you read, just say all you know as if it was your knowledge.
         Question: {question}
+        Remember that the visitor is already inside the museum, so try to suggest other operas inside it (while mentioning their location).
         """
-        if user_data["language"] != "":
-            self.after_rag_template = self.after_rag_template + f"Translate your answer in {user_data['language']}. Do not say anything about the fact that you translated the text."
+        print(f"Template set to : {self.after_rag_template}!")
 
+
+
+    def translate(self, text, language):
+        prompt = (f"Translate in {language}, the following text : {text}. "
+                  f"Translate ALL ENGLISH WORDS. Do not mention the fact that you translated it, just get the proper translation.")
+        translated = self.model_local(prompt=prompt)
+        return translated
 
 if __name__ == "__main__":
     # Streamlit UI setup
@@ -74,17 +97,7 @@ if __name__ == "__main__":
 
 
         transcription = None
-        '''
-        audio_file = st.audio_input("Record a voice message")
-        if audio_file is not None:
-            st.audio(audio_file, format="audio/wav")
-            with open("temp_audio.wav", "wb") as f:
-                f.write(audio_file.getbuffer())
 
-            #model = whisper.load_model("small", device="cuda:0")
-            transcription = st.session_state['orchestrator'].stt.transcribe("waa.wav", language="it", patience=2, beam_size=5)
-            #st.write("Transcription:", transcription['text'])
-        '''
 
         # React to user input
         if prompt := st.chat_input(init_questions[st.session_state['language']]["query template"]) or transcription:
@@ -97,15 +110,34 @@ if __name__ == "__main__":
             # Add user message to chat history
             st.session_state.messages.append({"role": "user", "content": prompt})
 
+            if st.session_state['language'] != "English":
+                prompt = st.session_state['orchestrator'].generator.translate(prompt, language="English")
+
             response = st.session_state['orchestrator'].generator.get_answer(str(prompt))
 
-            wav = st.session_state['orchestrator'].tts.tts_to_file(text=response, speaker_wav="audio_response.wav")
+            if st.session_state['language'] != "English":
+                response = st.session_state['orchestrator'].generator.translate(response, language=st.session_state['language'])
+
+            torch.cuda.empty_cache()  # Clear unused GPU memory
+            gc.collect()
+
+            st.session_state['orchestrator'].tts = st.session_state['orchestrator'].tts.to("cuda:0")
+            wav = st.session_state['orchestrator'].tts.tts_to_file(text=response,
+                                                                   speaker_wav="../Paris symbolise la c.m4a",
+                                                                   file_path="output.wav",
+                                                                   language=languages[st.session_state['language']])
+            st.session_state['orchestrator'].tts = st.session_state['orchestrator'].tts.to("cpu")
+            torch.cuda.empty_cache()  # Clear unused GPU memory
+            gc.collect()
+
             st.audio("output.wav", format="audio/mpeg", loop=False, autoplay=True)
-            # Display assistant response in chat message container
+
             with st.chat_message("assistant"):
-                #st.markdown(response)
                 response = st.write_stream(response_generator(response))
-                #st.session_state["orchestrator"].text_to_speech(response)
+
             # Add assistant response to chat history
             st.session_state.messages.append({"role": "assistant", "content": response})
+
+            torch.cuda.empty_cache()  # Clear unused GPU memory
+            gc.collect()
 

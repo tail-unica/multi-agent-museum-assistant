@@ -24,7 +24,7 @@ def get_user_info():
         st.session_state['knowledge'] = init_questions['English']["knowledge_settings"][kd_idx]
         st.session_state['age'] = age
         st.session_state['load_orch_thrd'].join()
-        st.session_state['orchestrator'].generator.set_rag_template(st.session_state)
+        st.session_state['orchestrator'].generator.set_rag_template()
         st.switch_page("pages/generation.py")
 
 

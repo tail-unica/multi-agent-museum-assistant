@@ -31,8 +31,8 @@ class Orchestrator():
         print("loading orchestrator")
         self.retriever = Retriever(cfg.urls, cfg.local_docs, cfg.embedding_model)
         self.generator = Generator(self.retriever, cfg.model_local)
-        self.tts = TTS('tts_models/en/ljspeech/glow-tts').to("cuda:0") #'tts_models/en/ljspeech/glow-tts' tts_models/it/mai_male/glow-tts
-        self.stt = whisper.load_model("small", device="cpu")#None
+        self.tts = TTS('tts_models/multilingual/multi-dataset/xtts_v2').to("cpu") #'tts_models/en/ljspeech/glow-tts' tts_models/it/mai_male/glow-tts
+        #self.stt = whisper.load_model("small", device="cpu")#None
 
     def text_to_speech(self, text):
         self.tts.say(text)

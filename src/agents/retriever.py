@@ -112,7 +112,7 @@ class Retriever():
         self.retriever = vectorstore
     '''
 
-    def _init_retriever(self):
+    def _init_retriever(self, force_reload=False):
 
         chromadb.api.client.SharedSystemClient.clear_system_cache()
 
@@ -121,7 +121,7 @@ class Retriever():
 
         start = time.time()
         if os.path.exists(cfg.chroma_db_config["path"]) and os.path.isdir(cfg.chroma_db_config["path"]) and len(
-                os.listdir(cfg.chroma_db_config["path"])) > 0 and False:
+                os.listdir(cfg.chroma_db_config["path"])) > 0 and not force_reload:
 
             vectorstore = Chroma(persist_directory=cfg.chroma_db_config["path"],
                                  embedding_function=embeddings.OllamaEmbeddings(model=self.embedding_model),
