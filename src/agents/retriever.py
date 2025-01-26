@@ -121,13 +121,9 @@ class Retriever():
 
         start = time.time()
         if os.path.exists(cfg.chroma_db_config["path"]) and os.path.isdir(cfg.chroma_db_config["path"]) and len(
-                os.listdir(cfg.chroma_db_config["path"])) > 0 and not force_reload:
+                os.listdir(cfg.chroma_db_config["path"])) > 1 and not force_reload:
 
-            vectorstore = Chroma(persist_directory=cfg.chroma_db_config["path"],
-                                 embedding_function=embeddings.OllamaEmbeddings(model=self.embedding_model),
-                                 collection_name=collection.name,
-                                 client=client)
-            print(f"Loaded pre-existing chroma database in {time.time() - start} seconds")
+            print(f"Loading pre-existing chroma database in {time.time() - start} seconds")
         else:
 
             #web_documents = self._load_web_documents(urls=self.urls)
@@ -145,21 +141,22 @@ class Retriever():
                                                   all_documents,
                                                   embedding_function=embeddings.OllamaEmbeddings(model=self.embedding_model)
                                                   )
-
-            vectorstore = Chroma(persist_directory=cfg.chroma_db_config["path"],
-                                 embedding_function=embeddings.OllamaEmbeddings(model=self.embedding_model),
-                                 collection_name=collection.name,
-                                 client=client)
-
-            '''
-            vectorstore = Chroma.from_documents(
-                client=client,
-                documents=doc_splits,
-                collection_name=collection.name,
-                embedding=embeddings.OllamaEmbeddings(model=self.embedding_model)
-            )
-            '''
             print(f"Created chroma database in {time.time() - start} seconds")
+
+        vectorstore = Chroma(persist_directory=cfg.chroma_db_config["path"],
+                             embedding_function=embeddings.OllamaEmbeddings(model=self.embedding_model),
+                             collection_name=collection.name,
+                             client=client)
+
+        '''
+        vectorstore = Chroma.from_documents(
+            client=client,
+            documents=doc_splits,
+            collection_name=collection.name,
+            embedding=embeddings.OllamaEmbeddings(model=self.embedding_model)
+        )
+        '''
+
 
         vectorstore.as_retriever()
         self.retriever = vectorstore
