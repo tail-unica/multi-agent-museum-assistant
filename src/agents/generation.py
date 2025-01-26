@@ -1,3 +1,4 @@
+import copy
 import gc
 import os
 import re
@@ -11,7 +12,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 import streamlit as st
 from streamlit.components.v1 import components
-from src.custom_style.microphone import html_code as mic_html
+from src.custom_style.microphone import add_audio_input
 from init_questions_multilanguage import init_questions
 import whisper
 import pyttsx3
@@ -32,7 +33,7 @@ def response_generator(response):
 
 
 class Generator():
-    def __init__(self, retriever, model_local, translator_model):
+    def __init__(self, retriever, model_local):
         #super(Generator, self).__init__()
         self.retriever = retriever
         self.retriever._init_retriever()
@@ -48,8 +49,10 @@ class Generator():
 
 
     def get_answer(self, question):
+        results, metadata = None, None
         if self.retriever.retriever.__class__.__name__ != "VectorStoreRetriever":
             self.retriever.retriever = self.retriever.retriever.as_retriever()
+
         after_rag_prompt = ChatPromptTemplate.from_template(self.after_rag_template)
         after_rag_chain = (
                 {"context": self.retriever.retriever, "question": RunnablePassthrough()}
@@ -57,7 +60,12 @@ class Generator():
                 | self.model_local
                 | StrOutputParser()
         )
-        return after_rag_chain.invoke(question)
+
+        results = self.retriever.retriever.vectorstore.similarity_search_with_score(question)
+        if results:
+            metadata = results[0][0].metadata
+
+        return after_rag_chain.invoke(question), metadata
 
     def format_history(self, history):
         if history == "None":
@@ -68,14 +76,32 @@ class Generator():
         hst += s
         return hst
 
-    def set_rag_template(self, history = "None"):
+    def set_rag_template(self, user_data=None):
+        if user_data["age"] != "" and user_data["knowledge"] != "":
+            self.user_data = user_data
+
+        customization = f"**Customization for visitor profile**: Adjust your answer to match the visitor's characteristics:\n"\
+        f"- **Age group**: {self.user_data['age']}\n"\
+        f"- **Knowledge of Sardinian history**: {self.user_data['knowledge']}\n"\
+        "Use the following guidelines to adapt your response:\n"\
+        "1. **Age customization**:\n"\
+        "   - Under 15: Keep it simple and fun, use storytelling and analogies.\n"\
+        "   - 15-23: Relatable and casual tone, highlight exciting or mysterious elements.\n"\
+        "   - 23-30: Balanced tone, focus on cultural connections and clarity.\n"\
+        "   - 30-45: Warm and professional, highlight meaningful insights.\n"\
+        "   - Over 50: Formal and respectful, focus on historical depth and traditions.\n"\
+        "2. **Knowledge customization**:\n"\
+        "   - Low: Focus on foundational and essential information.\n"\
+        "   - Medium: Add contextual depth and comparisons.\n"\
+        "   - High: Provide nuanced, advanced details and cultural connections.\n"\
 
         self.after_rag_template = """You are a local guide at the CIMA museum, and it is your duty to provide enjoyable and complete answers to the visitors, using only words that are easy to translate in other languages.
             Answer the question based only on the following context:
-        {context}. If the question does not match the context, just say that you don't know or that is not related to the museum.
+        {context}. If the question does not match the context, just say that you don't know or that is not related to the museum. DO NOT HALLUCINATE or invent/mention anything that is not provided in the context.
         Otherwise, provide insightful answers, including all you know about the question and possible related contents (only among the ones mentioned in the provided context). Do not mention the documents you read, just say all you know as if it was your knowledge.
+        """ + customization + """
         Question: {question}
-        Remember that the visitor is already inside the museum, so try to suggest other operas inside it (while mentioning their location), but only among the ones mentioned in the provided context.
+        Remember that the visitor is already inside the museum, so try to suggest other operas inside it (while mentioning their location), but only among the ones mentioned in the provided context. If some metadata about the answer is available, return it as photo_path = metadata
         """
         print(f"Template set to : {self.after_rag_template}!")
 
@@ -103,11 +129,24 @@ if __name__ == "__main__":
         audio_support = False
         transcription = None
 
+        audio_file = None #add_audio_input() #st.audio_input("Record a voice message")
+        if audio_file is not None:
+            #st.audio(audio_file, format="audio/wav")
+            with open("temp_audio.wav", "wb") as f:
+                f.write(audio_file.getbuffer())
+
+            model = whisper.load_model("small", device="cuda:0")
+            transcription = model.transcribe("temp_audio.wav", language=languages[st.session_state['language']], patience=2,
+                                                                            beam_size=5)
+            del model
+            torch.cuda.empty_cache()  # Clear unused GPU memory
+            gc.collect()
+
 
         # React to user input
         if prompt := st.chat_input(init_questions[st.session_state['language']]["query template"]) or transcription:
             #prompt = transcription["text"]
-            transcription = None
+            #transcription = None
             print(prompt)
             # Display user message in chat message container
             with st.chat_message("user"):
@@ -118,7 +157,8 @@ if __name__ == "__main__":
             if st.session_state['language'] != "English":
                 prompt = st.session_state['orchestrator'].generator.translate(prompt, languages[st.session_state['language']], "en")
 
-            response = st.session_state['orchestrator'].generator.get_answer(str(prompt))
+            response, metadata = st.session_state['orchestrator'].generator.get_answer(str(prompt))
+            print(metadata)
             # Regular expression to remove everything between <think> and </think>
             cleaned_text = re.sub(r"<think>.*?</think>", "", response)
             # Remove extra spaces (optional)
@@ -128,29 +168,30 @@ if __name__ == "__main__":
                 response = st.session_state['orchestrator'].generator.translate(response, "en", languages[st.session_state['language']])
 
 
-            if audio_support or True:
+            if audio_support:
                 speak = st.session_state['orchestrator'].generator.tts(text=response, lang=languages[st.session_state['language']], slow=False)
-                #del st.session_state['orchestrator'].generator.model_local
-                #torch.cuda.empty_cache()  # Clear unused GPU memory
-                #gc.collect()
-
-                #print(os.getcwd())
-                #st.session_state['orchestrator'].tts = st.session_state['orchestrator'].tts.to("cuda:0")
-                #wav = st.session_state['orchestrator'].tts.tts_to_file(text=response,
-                                                                       #speaker_wav="../voice_samples/female_voice.m4a",
-                                                                       #file_path="output.wav",
-                                                                       #language=languages[st.session_state['language']])
-                #st.session_state['orchestrator'].tts = st.session_state['orchestrator'].tts.to("cpu")
-
-
-                #torch.cuda.empty_cache()  # Clear unused GPU memory
-                #gc.collect()
-                #st.session_state['orchestrator'].generator.model_local = Ollama(model=st.session_state['orchestrator'].generator.model_local_name)
                 speak.save("output.mp3")
                 st.audio("output.mp3", format="audio/mpeg", loop=False, autoplay=True)
 
             with st.chat_message("assistant"):
                 response = st.write_stream(response_generator(response))
+
+            if metadata:
+                caption = ""
+                img = metadata["foto"]
+                try:
+                    caption = metadata['DIDASCALIE/TESTI ']
+                except:
+                    pass
+                try:
+                    caption = metadata['TESTO']
+                except:
+                    pass
+                if img != "Not Available":
+                    caption = caption.split(".")[0]+"."
+                    st.image(img, caption=caption, use_container_width=True)
+
+
 
             # Add assistant response to chat history
             st.session_state.messages.append({"role": "assistant", "content": response})

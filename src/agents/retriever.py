@@ -54,9 +54,12 @@ class Retriever():
             text = content.get("DIDASCALIE/TESTI ", "")  # Use the text content
             if text is None:
                 print("None-content")
-                text = content.get("TESTO ", "")
+                text = content.get("TESTO", "")
 
-            metadata = {key: content[key] for key in content if key != "DIDASCALIE/TESTI " or key != "TESTO "}
+            metadata = {key: content[key] for key in content if key != "DIDASCALIE/TESTI " or key != "TESTO"}
+            for key, value in metadata.items():
+                if value is None:
+                    metadata[key] = "Not Available"
             documents.append({"id": record_id, "text": text, "metadata": metadata})
         return documents
 
