@@ -3,7 +3,7 @@ import gc
 import os
 import re
 import time
-
+import deepl
 import torch
 from gtts import gTTS
 from langchain_community.llms.ollama import Ollama
@@ -17,14 +17,10 @@ from init_questions_multilanguage import init_questions
 import whisper
 import pyttsx3
 from googletrans import Translator
+from src.api import api_key
+from src.config import config as cfg
 
 
-languages = {
-    "English": "en",
-    "French": "fr",
-    "Italian": "it",
-    "German": "de"
-}
 
 def response_generator(response):
     for word in response.split():
@@ -40,6 +36,7 @@ class Generator():
         self.model_local_name = model_local
         self.model_local = Ollama(model=self.model_local_name)
         self.translator = Translator()
+        self.deepl_translator = deepl.Translator(api_key)
         self.tts = gTTS
         self.user_data = None
         self.after_rag_template = """Answer the question based only on the following context:
@@ -62,8 +59,11 @@ class Generator():
         )
 
         results = self.retriever.retriever.vectorstore.similarity_search_with_score(question)
+        print(results)
         if results:
             metadata = results[0][0].metadata
+            if results[0][1] > 750:
+                metadata = None
 
         return after_rag_chain.invoke(question), metadata
 
@@ -108,7 +108,12 @@ class Generator():
 
 
     def translate(self, text, source_lan, dest_lan):
-        translated = self.translator.translate(text, src=source_lan, dest=dest_lan)
+
+        try:
+            translated = self.deepl_translator.translate_text(text, target_lang=dest_lan.upper())
+        except Exception as e:
+            translated = self.translator.translate(text, src=source_lan, dest=dest_lan)
+
         return translated.text
 
 if __name__ == "__main__":
@@ -126,7 +131,7 @@ if __name__ == "__main__":
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-        audio_support = False
+        audio_support = True
         transcription = None
 
         audio_file = None #add_audio_input() #st.audio_input("Record a voice message")
@@ -136,7 +141,7 @@ if __name__ == "__main__":
                 f.write(audio_file.getbuffer())
 
             model = whisper.load_model("small", device="cuda:0")
-            transcription = model.transcribe("temp_audio.wav", language=languages[st.session_state['language']], patience=2,
+            transcription = model.transcribe("temp_audio.wav", language=cfg.languages[st.session_state['language']], patience=2,
                                                                             beam_size=5)
             del model
             torch.cuda.empty_cache()  # Clear unused GPU memory
@@ -155,23 +160,25 @@ if __name__ == "__main__":
             st.session_state.messages.append({"role": "user", "content": prompt})
 
             if st.session_state['language'] != "English":
-                prompt = st.session_state['orchestrator'].generator.translate(prompt, languages[st.session_state['language']], "en")
+                prompt = st.session_state['orchestrator'].generator.translate(prompt, cfg.languages[st.session_state['language']], "en")
+
+            print(prompt)
 
             response, metadata = st.session_state['orchestrator'].generator.get_answer(str(prompt))
             print(metadata)
             # Regular expression to remove everything between <think> and </think>
-            cleaned_text = re.sub(r"<think>.*?</think>", "", response)
+            cleaned_text = re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL)
             # Remove extra spaces (optional)
             response = " ".join(cleaned_text.split())
 
             if st.session_state['language'] != "English":
-                response = st.session_state['orchestrator'].generator.translate(response, "en", languages[st.session_state['language']])
+                response = st.session_state['orchestrator'].generator.translate(response, "en", cfg.languages[st.session_state['language']])
 
 
             if audio_support:
-                speak = st.session_state['orchestrator'].generator.tts(text=response, lang=languages[st.session_state['language']], slow=False)
+                speak = st.session_state['orchestrator'].generator.tts(text=response, lang=cfg.languages[st.session_state['language']], slow=False)
                 speak.save("output.mp3")
-                st.audio("output.mp3", format="audio/mpeg", loop=False, autoplay=True)
+                st.audio("output.mp3", format="audio/mpeg", loop=False, autoplay=False)
 
             with st.chat_message("assistant"):
                 response = st.write_stream(response_generator(response))
@@ -180,15 +187,10 @@ if __name__ == "__main__":
                 caption = ""
                 img = metadata["foto"]
                 try:
-                    caption = metadata['DIDASCALIE/TESTI ']
-                except:
-                    pass
-                try:
-                    caption = metadata['TESTO']
+                    caption = metadata['caption']
                 except:
                     pass
                 if img != "Not Available":
-                    caption = caption.split(".")[0]+"."
                     st.image(img, caption=caption, use_container_width=True)
 
 

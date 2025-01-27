@@ -12,4 +12,10 @@ config.chroma_db_config = {
     "timeout": 20,
     "path": f"../tmp/chroma-json-{config.model_local}-{config.embedding_model}"
 }
-config.llama_parser_api = "llx-Di3KtLdfUGsLzNosaavgqGUuFKh3m8TnLljxV0tLUHoPBMpH"
+
+config.languages = {
+    "English": "en",
+    "French": "fr",
+    "Italian": "it",
+    "German": "de"
+}

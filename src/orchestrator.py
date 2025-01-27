@@ -61,12 +61,14 @@ def start_session(session_state):
     # orchestrator = Orchestrator()
 
     if st.button('Continue'):
+        st.session_state['load_orch_thrd'].start()
         print(option)
         print(st.session_state)
         st.switch_page("pages/profiling.py")
 
 
 if __name__ == "__main__":
+    st.set_page_config(initial_sidebar_state="collapsed")
     ctx = get_script_run_ctx()
 
     load_orchestrator_thread = threading.Thread(target=load_orchestrator, name="load_orchestrator", args=[st.session_state], daemon=True)
@@ -78,7 +80,7 @@ if __name__ == "__main__":
     st.session_state['load_orch_thrd'] = load_orchestrator_thread
 
 
-    load_orchestrator_thread.start()
+    #load_orchestrator_thread.start()
     start_session_thread.start()
 
     #load_orchestrator_thread.join()

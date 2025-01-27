@@ -1,7 +1,8 @@
 import json
 import os
 import time
-
+import streamlit as st
+import deepl
 from langchain_community.document_loaders import WebBaseLoader # for web documents
 from langchain_community.document_loaders import DirectoryLoader # for local documents
 from langchain_community.document_loaders import PyPDFLoader # for local documents
@@ -9,6 +10,8 @@ from langchain_community.vectorstores import Chroma
 from langchain_community import embeddings
 from langchain.text_splitter import CharacterTextSplitter
 import chromadb
+import locale
+from src.api import api_key
 from src.config import config as cfg
 
 class Retriever():
@@ -19,6 +22,8 @@ class Retriever():
         self.document_root = document_root
         self.embedding_model = embedding_model
         self.retriever = None
+        self.deepl_translator = deepl.Translator(api_key)
+        self.language = cfg.languages[st.session_state['language']]#locale.getdefaultlocale()[0].split("_")[0]
         #self.retriever = self._init_retriever(document_db=self.document_db, embedding_model=self.embedding_model)
 
 
@@ -56,7 +61,14 @@ class Retriever():
                 print("None-content")
                 text = content.get("TESTO", "")
 
-            metadata = {key: content[key] for key in content if key != "DIDASCALIE/TESTI " or key != "TESTO"}
+            if text and self.language != "it":
+                if self.language == "en":
+                    self.language = "en-us"
+                text = self.deepl_translator.translate_text(text, target_lang=self.language.upper()).text
+
+            metadata = {key: content[key] for key in content if key != "DIDASCALIE/TESTI " and key != "TESTO"}
+            metadata["caption"] = text.split(".")[0]+"."
+
             for key, value in metadata.items():
                 if value is None:
                     metadata[key] = "Not Available"
@@ -78,44 +90,12 @@ class Retriever():
             )
         return collection
 
-    '''
-    def _init_retriever(self):
-
-        chromadb.api.client.SharedSystemClient.clear_system_cache()
-
-        client = chromadb.PersistentClient(path=cfg.chroma_db_config["path"])
-        collection = client.get_or_create_collection(name="rag-chroma")
-
-        start = time.time()
-        if os.path.exists(cfg.chroma_db_config["path"]) and os.path.isdir(cfg.chroma_db_config["path"]) and len(os.listdir(cfg.chroma_db_config["path"])) > 0:
-
-            vectorstore = Chroma(persist_directory=cfg.chroma_db_config["path"],
-                                 embedding_function=embeddings.OllamaEmbeddings(model=self.embedding_model),
-                                 collection_name=collection.name,
-                                 client=client)
-            print(f"Loaded pre-existing chroma database in {time.time() - start} seconds")
-        else:
-
-            web_documents = self._load_web_documents(urls=self.urls)
-            local_documents = self._load_local_documents(document_root=self.document_root)
-            self.document_db = web_documents + local_documents
-
-            text_splitter = CharacterTextSplitter.from_tiktoken_encoder(chunk_size=1024, chunk_overlap=100)
-            doc_splits = text_splitter.split_documents(self.document_db)
-
-            vectorstore = Chroma.from_documents(
-                client=client,
-                documents=doc_splits,
-                collection_name=collection.name,
-                embedding=embeddings.OllamaEmbeddings(model=self.embedding_model)
-            )
-            print("Created chroma database in {time.time() - start} seconds")
-
-        vectorstore.as_retriever()
-        self.retriever = vectorstore
-    '''
 
     def _init_retriever(self, force_reload=False):
+        if self.language == "it":
+            cfg.chroma_db_config["path"] = f"{cfg.chroma_db_config['path']}_it"
+        else:
+            cfg.chroma_db_config["path"] = f"{cfg.chroma_db_config['path']}_en"
 
         chromadb.api.client.SharedSystemClient.clear_system_cache()
 
@@ -126,7 +106,7 @@ class Retriever():
         if os.path.exists(cfg.chroma_db_config["path"]) and os.path.isdir(cfg.chroma_db_config["path"]) and len(
                 os.listdir(cfg.chroma_db_config["path"])) > 1 and not force_reload:
 
-            print(f"Loading pre-existing chroma database in {time.time() - start} seconds")
+            print(f"Loading {cfg.chroma_db_config['path']} chroma database in {time.time() - start} seconds")
         else:
 
             #web_documents = self._load_web_documents(urls=self.urls)
@@ -144,7 +124,7 @@ class Retriever():
                                                   all_documents,
                                                   embedding_function=embeddings.OllamaEmbeddings(model=self.embedding_model)
                                                   )
-            print(f"Created chroma database in {time.time() - start} seconds")
+            print(f"Created {cfg.chroma_db_config['path']} chroma database in {time.time() - start} seconds")
 
         vectorstore = Chroma(persist_directory=cfg.chroma_db_config["path"],
                              embedding_function=embeddings.OllamaEmbeddings(model=self.embedding_model),
