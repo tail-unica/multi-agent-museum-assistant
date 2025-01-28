@@ -19,7 +19,7 @@ import pyttsx3
 from googletrans import Translator
 from src.api import api_key
 from src.config import config as cfg
-
+from src.custom_style.style import add_logo
 
 
 def response_generator(response):
@@ -59,7 +59,7 @@ class Generator():
         )
 
         results = self.retriever.retriever.vectorstore.similarity_search_with_score(question)
-        print(results)
+        #print(results)
         if results:
             metadata = results[0][0].metadata
             if results[0][1] > 750:
@@ -95,29 +95,35 @@ class Generator():
         "   - Medium: Add contextual depth and comparisons.\n"\
         "   - High: Provide nuanced, advanced details and cultural connections.\n"\
 
-        self.after_rag_template = """You are a local guide at the CIMA museum, and it is your duty to provide enjoyable and complete answers to the visitors, using only words that are easy to translate in other languages.
+        self.after_rag_template = """You are a local guide at the CIMA museum, and it is your duty to provide enjoyable and complete answers to the visitors, using only words that are easy to understand.
             Answer the question based only on the following context:
-        {context}. If the question does not match the context, just say that you don't know or that is not related to the museum. DO NOT HALLUCINATE or invent/mention anything that is not provided in the context.
-        Otherwise, provide insightful answers, including all you know about the question and possible related contents (only among the ones mentioned in the provided context). Do not mention the documents you read, just say all you know as if it was your knowledge.
+        {context}. If the question does not match the context, just say that it is not related to the museum. Avoid hallucinating or inventing/mention anything that is not related in the context.
+        Otherwise, provide insightful answers, using only information's matching both the context and the question. Do not mention the documents you read, just say all you know as if it was your knowledge.
+        Answer only the question, avoiding inappropriate or useless addictions to the answer. This will make everything easier to understand for the user.
         """ + customization + """
         Question: {question}
-        Remember that the visitor is already inside the museum, so try to suggest other operas inside it (while mentioning their location), but only among the ones mentioned in the provided context. If some metadata about the answer is available, return it as photo_path = metadata
+        Opera and musical works are not part of the museum, so avoid talking about them.
+        The museum is open and full of sardinian history operas. If an user asks about opening times for the museum, just say the opening times and no more.
+        Remember that the visitor is already inside the museum, so try to suggest other operas inside it (while mentioning their location), but only among the ones mentioned in the provided context.
         """
-        print(f"Template set to : {self.after_rag_template}!")
+        #print(f"Template set to : {self.after_rag_template}!")
 
 
 
     def translate(self, text, source_lan, dest_lan):
 
         try:
+            print("Deepl")
             translated = self.deepl_translator.translate_text(text, target_lang=dest_lan.upper())
         except Exception as e:
+            print("Google")
             translated = self.translator.translate(text, src=source_lan, dest=dest_lan)
 
         return translated.text
 
 if __name__ == "__main__":
     # Streamlit UI setup
+    add_logo()
     if 'orchestrator' in st.session_state:
 
         st.title(init_questions[st.session_state['language']]["title"])
@@ -152,7 +158,7 @@ if __name__ == "__main__":
         if prompt := st.chat_input(init_questions[st.session_state['language']]["query template"]) or transcription:
             #prompt = transcription["text"]
             #transcription = None
-            print(prompt)
+            #print(prompt)
             # Display user message in chat message container
             with st.chat_message("user"):
                 st.markdown(prompt)
@@ -160,19 +166,22 @@ if __name__ == "__main__":
             st.session_state.messages.append({"role": "user", "content": prompt})
 
             if st.session_state['language'] != "English":
-                prompt = st.session_state['orchestrator'].generator.translate(prompt, cfg.languages[st.session_state['language']], "en")
 
-            print(prompt)
+                prompt = st.session_state['orchestrator'].generator.translate(prompt, cfg.languages[st.session_state['language']], "en")
+                print(prompt)
+
+            #print(prompt)
 
             response, metadata = st.session_state['orchestrator'].generator.get_answer(str(prompt))
-            print(metadata)
+            #print(metadata)
             # Regular expression to remove everything between <think> and </think>
             cleaned_text = re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL)
             # Remove extra spaces (optional)
             response = " ".join(cleaned_text.split())
 
             if st.session_state['language'] != "English":
-                response = st.session_state['orchestrator'].generator.translate(response, "en", cfg.languages[st.session_state['language']])
+                print(response)
+                response = st.session_state['orchestrator'].generator.translate(response.replace("*", ""), "en", cfg.languages[st.session_state['language']])
 
 
             if audio_support:

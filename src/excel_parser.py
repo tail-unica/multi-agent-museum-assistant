@@ -48,6 +48,7 @@ def parse_excel_to_json(file_path, output_folder="../dummy-data-json_v2", image_
 
                     # Add the image path if an image is mapped to this row
                     row_data["foto"] = image_map[sh_idx].get(row_idx, None)
+                    row_data["room"] = sheet_name
 
                 # Add row data to JSON
                 json_data[entry] = row_data
@@ -63,5 +64,5 @@ def parse_excel_to_json(file_path, output_folder="../dummy-data-json_v2", image_
     return json_data
 
 # File paths
-excel_file_path = "/media/Workspace/Projects/multi-agent-museum-assistant/dummy-data-xlsx/MaterialiEsposti_TestiDidascalie_20242029.xlsx"
+excel_file_path = "/media/Workspace/Projects/multi-agent-museum-assistant/dummy-data-xlsx/TestiGeneraliAllai_20241021.xlsx"
 parse_excel_to_json(excel_file_path)

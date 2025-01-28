@@ -15,7 +15,7 @@ from src.api import api_key
 from src.config import config as cfg
 
 class Retriever():
-    def __init__(self, urls, document_root, embedding_model="paraphrase-multilingual"):
+    def __init__(self, urls, document_root, embedding_model="bge-m3", language="en"):
         #super(Retriever, self).__init__()
         print(os.getcwd())
         self.urls = urls
@@ -23,8 +23,7 @@ class Retriever():
         self.embedding_model = embedding_model
         self.retriever = None
         self.deepl_translator = deepl.Translator(api_key)
-        self.language = cfg.languages[st.session_state['language']]#locale.getdefaultlocale()[0].split("_")[0]
-        #self.retriever = self._init_retriever(document_db=self.document_db, embedding_model=self.embedding_model)
+        self.language = language if not cfg.languages[st.session_state['language']] else cfg.languages[st.session_state['language']]
 
 
     def _load_web_documents(self, urls):
@@ -61,6 +60,8 @@ class Retriever():
                 print("None-content")
                 text = content.get("TESTO", "")
 
+            if int(record_id) < 200:
+                text += f" Situato in: {content.get('room', '')}"
             if text and self.language != "it":
                 if self.language == "en":
                     self.language = "en-us"
@@ -68,6 +69,7 @@ class Retriever():
 
             metadata = {key: content[key] for key in content if key != "DIDASCALIE/TESTI " and key != "TESTO"}
             metadata["caption"] = text.split(".")[0]+"."
+            metadata["room"] = content.get("room", "")
 
             for key, value in metadata.items():
                 if value is None:
@@ -92,10 +94,10 @@ class Retriever():
 
 
     def _init_retriever(self, force_reload=False):
-        if self.language == "it":
-            cfg.chroma_db_config["path"] = f"{cfg.chroma_db_config['path']}_it"
-        else:
-            cfg.chroma_db_config["path"] = f"{cfg.chroma_db_config['path']}_en"
+        #if self.language == "it":
+        #    cfg.chroma_db_config["path"] = f"{cfg.chroma_db_config['path']}_it"
+        #else:
+        cfg.chroma_db_config["path"] = f"{cfg.chroma_db_config['path']}_en"
 
         chromadb.api.client.SharedSystemClient.clear_system_cache()
 

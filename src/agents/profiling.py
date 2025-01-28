@@ -1,10 +1,12 @@
 import streamlit as st
 from init_questions_multilanguage import init_questions
+from src.custom_style.style import add_logo
+
 
 def get_user_info():
     # Streamlit UI setup
     st.title(init_questions[st.session_state['language']]["userinfo"])
-
+    add_logo()
 
     # Input fields
 

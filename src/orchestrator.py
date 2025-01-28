@@ -4,6 +4,7 @@ import whisper
 from TTS.api import TTS
 from init_questions_multilanguage import init_questions
 from src.agents.retriever import Retriever
+from src.custom_style.style import global_css, add_logo
 from src.agents.profiling import get_user_info
 from src.agents.generation import Generator
 from src.config import config as cfg
@@ -19,11 +20,9 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx,get_script_run_ctx
 #sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 
-chroma_db_config = {
-    "client": "PersistentClient",
-    "timeout": 20,
-    "path": "../tmp/chroma"
-}
+
+
+
 
 class Orchestrator():
     def __init__(self):
@@ -46,9 +45,6 @@ def load_orchestrator(session_state):
 def start_session(session_state):
     session_state['knowledge'] = ""
     session_state['age'] = ""
-    conn = st.connection(name="persistent_chromadb",
-                         type=ChromadbConnection,
-                         **chroma_db_config)
 
     option = st.selectbox(
         "Scegli la tua lingua / Choose your Language / Choisissez votre langue / Wählen Sie Ihre Sprache",
@@ -62,13 +58,20 @@ def start_session(session_state):
 
     if st.button('Continue'):
         st.session_state['load_orch_thrd'].start()
-        print(option)
-        print(st.session_state)
+        #print(option)
+        #print(st.session_state)
         st.switch_page("pages/profiling.py")
 
 
 if __name__ == "__main__":
     st.set_page_config(initial_sidebar_state="collapsed")
+    # Inject the global CSS styles
+    # Display the custom HTML
+    #st.components.v1.html(global_css)
+    add_logo()
+
+
+
     ctx = get_script_run_ctx()
 
     load_orchestrator_thread = threading.Thread(target=load_orchestrator, name="load_orchestrator", args=[st.session_state], daemon=True)
