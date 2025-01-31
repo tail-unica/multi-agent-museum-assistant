@@ -4,6 +4,7 @@ import os
 import re
 import time
 import deepl
+import requests
 import torch
 from gtts import gTTS
 from langchain_community.llms.ollama import Ollama
@@ -11,12 +12,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 import streamlit as st
-from streamlit.components.v1 import components
-from src.custom_style.microphone import add_audio_input
 from init_questions_multilanguage import init_questions
-import whisper
-import pyttsx3
-from googletrans import Translator
 from src.api import api_key
 from src.config import config as cfg
 from src.custom_style.style import add_logo
@@ -35,7 +31,6 @@ class Generator():
         self.retriever._init_retriever()
         self.model_local_name = model_local
         self.model_local = Ollama(model=self.model_local_name)
-        self.translator = Translator()
         self.deepl_translator = deepl.Translator(api_key)
         self.tts = gTTS
         self.user_data = None
@@ -51,6 +46,8 @@ class Generator():
             self.retriever.retriever = self.retriever.retriever.as_retriever()
 
         after_rag_prompt = ChatPromptTemplate.from_template(self.after_rag_template)
+        print(f"Prompt: {after_rag_prompt}")
+
         after_rag_chain = (
                 {"context": self.retriever.retriever, "question": RunnablePassthrough()}
                 | after_rag_prompt
@@ -85,7 +82,7 @@ class Generator():
         f"- **Knowledge of Sardinian history**: {self.user_data['knowledge']}\n"\
         "Use the following guidelines to adapt your response:\n"\
         "1. **Age customization**:\n"\
-        "   - Under 15: Keep it simple and fun, use storytelling and analogies.\n"\
+        "   - Under 15: Keep it simple and fun, use analogies were they stick to the context.\n"\
         "   - 15-23: Relatable and casual tone, highlight exciting or mysterious elements.\n"\
         "   - 23-30: Balanced tone, focus on cultural connections and clarity.\n"\
         "   - 30-45: Warm and professional, highlight meaningful insights.\n"\
@@ -97,9 +94,9 @@ class Generator():
 
         self.after_rag_template = """You are a local guide at the CIMA museum, and it is your duty to provide enjoyable and complete answers to the visitors, using only words that are easy to understand.
             Answer the question based only on the following context:
-        {context}. If the question does not match the context, just say that it is not related to the museum. Avoid hallucinating or inventing/mention anything that is not related in the context.
+        {context}. If the question does not match the context, just say that it is not related to the museum. Avoid hallucinating or inventing/mention anything that is not related to the context.
         Otherwise, provide insightful answers, using only information's matching both the context and the question. Do not mention the documents you read, just say all you know as if it was your knowledge.
-        Answer only the question, avoiding inappropriate or useless addictions to the answer. This will make everything easier to understand for the user.
+        Answer only the question, avoiding inappropriate or useless addictions to the answer. 
         """ + customization + """
         Question: {question}
         Opera and musical works are not part of the museum, so avoid talking about them.
@@ -108,21 +105,59 @@ class Generator():
         """
         #print(f"Template set to : {self.after_rag_template}!")
 
+    def translate_locally(self, text, source_lang, target_lang):
+        '''
+        tokernizer_local = copy.deepcopy(self.tokenizer)
+        tokernizer_local.tgt_lang = target_lang
 
+        inputs = tokernizer_local(text, return_tensors="pt")#.to("cuda:0")
+        if torch.cuda.is_available():
+            inputs = inputs.to("cuda:0")
+
+        generated_tokens = self.translator_local.generate(**inputs)
+        translated_text = tokernizer_local.batch_decode(generated_tokens, skip_special_tokens=True)
+
+        return translated_text[0]
+        '''
+        url = "http://localhost:2048/translate"
+        data = {
+            "text": text,
+            "source_lang": source_lang,
+            "target_lang": target_lang
+        }
+
+        # Send the POST request
+        response = requests.post(url, json=data)
+
+        # Check for a successful response
+        if response.status_code == 200:
+            translated_text = response.json().get("translated_text")
+            translated_text = translated_text.replace(".", ". ")
+            translated_text = translated_text.replace("sardina", "sarda")
+
+        else:
+            translated_text = "Server not available. Please try again later."
+        return translated_text
 
     def translate(self, text, source_lan, dest_lan):
 
         try:
             print("Deepl")
-            translated = self.deepl_translator.translate_text(text, target_lang=dest_lan.upper())
+            if dest_lan == "en":
+                dest_lan = "en-us"
+            translated = self.deepl_translator.translate_text(text, target_lang=dest_lan.upper()).text
         except Exception as e:
-            print("Google")
-            translated = self.translator.translate(text, src=source_lan, dest=dest_lan)
+            print("Local")
+            if dest_lan == "en-us":
+                dest_lan = "en"
+            translated = self.translate_locally(text, source_lan, dest_lan)
+            #translated = self.gtranslate(text, target_lang=dest_lan)
 
-        return translated.text
+        return translated
 
 if __name__ == "__main__":
     # Streamlit UI setup
+
     add_logo()
     if 'orchestrator' in st.session_state:
 
@@ -142,16 +177,25 @@ if __name__ == "__main__":
 
         audio_file = None #add_audio_input() #st.audio_input("Record a voice message")
         if audio_file is not None:
+            pass
             #st.audio(audio_file, format="audio/wav")
-            with open("temp_audio.wav", "wb") as f:
-                f.write(audio_file.getbuffer())
+            #with open("temp_audio.wav", "wb") as f:
+            #    f.write(audio_file.getbuffer())
 
-            model = whisper.load_model("small", device="cuda:0")
-            transcription = model.transcribe("temp_audio.wav", language=cfg.languages[st.session_state['language']], patience=2,
-                                                                            beam_size=5)
-            del model
-            torch.cuda.empty_cache()  # Clear unused GPU memory
-            gc.collect()
+            #model = whisper.load_model("small", device="cuda:0")
+            #transcription = model.transcribe("temp_audio.wav", language=cfg.languages[st.session_state['language']], patience=2, beam_size=5)
+            #del model
+            #torch.cuda.empty_cache()  # Clear unused GPU memory
+            #gc.collect()
+
+        if not st.session_state['cheered']:
+            welcome_message = "Welcome to the CIMA museum in Allai! :) How can I help  you?"
+            if st.session_state['language'] != "English":
+                welcome_message = st.session_state['orchestrator'].generator.translate(welcome_message, "en", cfg.languages[st.session_state['language']])
+
+            with st.chat_message("assistant"):
+                st.write_stream(response_generator(welcome_message))
+            st.session_state['cheered'] = True
 
 
         # React to user input
@@ -171,21 +215,29 @@ if __name__ == "__main__":
                 print(prompt)
 
             #print(prompt)
-
-            response, metadata = st.session_state['orchestrator'].generator.get_answer(str(prompt))
+            with st.spinner(init_questions[st.session_state['language']]["think"]):
+                response, metadata = st.session_state['orchestrator'].generator.get_answer(str(prompt))
             #print(metadata)
             # Regular expression to remove everything between <think> and </think>
             cleaned_text = re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL)
             # Remove extra spaces (optional)
             response = " ".join(cleaned_text.split())
 
+            response = response.split("Answer:")[0]
+
+            response = response.replace("Mениh", "menhir")
+            response = response.replace("mhenry", "menhir")
+            response = response.replace("betylr", "betile")
+
             if st.session_state['language'] != "English":
+                #with st.spinner(init_questions[st.session_state['language']]["translating"]):
                 print(response)
-                response = st.session_state['orchestrator'].generator.translate(response.replace("*", ""), "en", cfg.languages[st.session_state['language']])
+                response = response.replace("betyle", "betile")
+                response = st.session_state['orchestrator'].generator.translate(response, "en", cfg.languages[st.session_state['language']])
 
 
             if audio_support:
-                speak = st.session_state['orchestrator'].generator.tts(text=response, lang=cfg.languages[st.session_state['language']], slow=False)
+                speak = st.session_state['orchestrator'].generator.tts(text=response.replace("*", ""), lang=cfg.languages[st.session_state['language']], slow=False)
                 speak.save("output.mp3")
                 st.audio("output.mp3", format="audio/mpeg", loop=False, autoplay=False)
 

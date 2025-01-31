@@ -10,6 +10,8 @@ def get_user_info():
 
     # Input fields
 
+    st.text(init_questions[st.session_state['language']]["info2"])
+
     knowledge = st.selectbox(
         init_questions[st.session_state['language']]["knowledge level"],
         init_questions[st.session_state['language']]["knowledge_settings"],
@@ -21,7 +23,7 @@ def get_user_info():
 
     kd_idx = init_questions[st.session_state['language']]["knowledge_settings"].index(knowledge)
     # Button to process input
-    if st.button('Send Data'):
+    if st.button(init_questions[st.session_state['language']]["send_data"]):
         # with st.spinner('Processing...'):
         st.session_state['knowledge'] = init_questions['English']["knowledge_settings"][kd_idx]
         st.session_state['age'] = age

@@ -1,25 +1,19 @@
+import os
 import sys
 sys.path.append('src/agents')
-import whisper
-from TTS.api import TTS
 from init_questions_multilanguage import init_questions
 from src.agents.retriever import Retriever
-from src.custom_style.style import global_css, add_logo
-from src.agents.profiling import get_user_info
+from src.custom_style.style import add_logo
 from src.agents.generation import Generator
 from src.config import config as cfg
 import streamlit as st
-import sys
-import concurrent.futures
 import threading
-from multiprocessing import Process
-from streamlit_chromadb_connection.chromadb_connection import ChromadbConnection
 from streamlit.runtime.scriptrunner import add_script_run_ctx,get_script_run_ctx
 
 #__import__('pysqlite3')
 #sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
-
+#os.system("pip install googletrans==4.0.0rc1")
 
 
 
@@ -56,7 +50,7 @@ def start_session(session_state):
 
     # orchestrator = Orchestrator()
 
-    if st.button('Continue'):
+    if st.button(init_questions[st.session_state['language']]["send_data"]):
         st.session_state['load_orch_thrd'].start()
         #print(option)
         #print(st.session_state)
@@ -81,6 +75,7 @@ if __name__ == "__main__":
     add_script_run_ctx(start_session_thread, ctx)
 
     st.session_state['load_orch_thrd'] = load_orchestrator_thread
+    st.session_state['cheered'] = False
 
 
     #load_orchestrator_thread.start()

@@ -1,14 +1,16 @@
+import copy
 import json
 import os
 import time
+
+import requests
 import streamlit as st
 import deepl
+import torch
 from langchain_community.document_loaders import WebBaseLoader # for web documents
-from langchain_community.document_loaders import DirectoryLoader # for local documents
 from langchain_community.document_loaders import PyPDFLoader # for local documents
 from langchain_community.vectorstores import Chroma
 from langchain_community import embeddings
-from langchain.text_splitter import CharacterTextSplitter
 import chromadb
 import locale
 from src.api import api_key
@@ -52,6 +54,25 @@ class Retriever():
                     data.append(json.load(file))
         return data
 
+    def translate_locally(self, text, source_lan="it", target_lang="en"):
+        url = "http://localhost:2048/translate"
+        data = {
+            "text": text,
+            "source_lang": source_lan,
+            "target_lang": target_lang
+        }
+
+        # Send the POST request
+        response = requests.post(url, json=data)
+
+        # Check for a successful response
+        if response.status_code == 200:
+            translated_text = response.json().get("translated_text")
+        else:
+            translated_text = "Server not available. Please try again later."
+        return translated_text
+
+
     def process_data_for_chromadb(self, json_data):
         documents = []
         for record_id, content in json_data.items():
@@ -63,9 +84,13 @@ class Retriever():
             if int(record_id) < 200:
                 text += f" Situato in: {content.get('room', '')}"
             if text and self.language != "it":
-                if self.language == "en":
-                    self.language = "en-us"
-                text = self.deepl_translator.translate_text(text, target_lang=self.language.upper()).text
+                try:
+                    if self.language == "en":
+                        self.language = "en-us"
+                    text = self.deepl_translator.translate_text(text, target_lang=self.language.upper()).text
+                except:
+                    print("Failed!")
+                    self.translate_locally(text, source_lan="it", target_lang="en")
 
             metadata = {key: content[key] for key in content if key != "DIDASCALIE/TESTI " and key != "TESTO"}
             metadata["caption"] = text.split(".")[0]+"."
