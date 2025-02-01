@@ -25,7 +25,10 @@ class Retriever():
         self.embedding_model = embedding_model
         self.retriever = None
         self.deepl_translator = deepl.Translator(api_key)
-        self.language = language if not cfg.languages[st.session_state['language']] else cfg.languages[st.session_state['language']]
+        if 'language' in st.session_state.keys():
+            self.language = cfg.languages[st.session_state['language']]
+        else:
+            self.language = language
 
 
     def _load_web_documents(self, urls):
