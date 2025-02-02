@@ -1,3 +1,15 @@
+
+![Python Version](https://img.shields.io/badge/python-3.10-blue)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.40.1-ff4b4b?logo=streamlit)
+![LangChain](https://img.shields.io/badge/LangChain-v0.2.43-blue?logo=langchain&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-latest-2496ed?logo=docker&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-v0.1.0-4b8bbe?logo=code&logoColor=white)
+![gTTS](https://img.shields.io/badge/gTTS-v2.5.4-brightgreen?logo=google&logoColor=white)
+![DeepL](https://img.shields.io/badge/DeepL-API%20Integration-blue?logo=translate&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.4.1-orange?logo=pytorch&logoColor=white)
+
+
+
 # Multi-Agent Museum Assistant
 
 <div align="center">
