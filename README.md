@@ -11,7 +11,7 @@
 
 
 
-# Multi-Agent Museum Assistant
+# MAMA: a Multi-Agent Museum Assistant
 
 <div align="center">
  <img src="scheme.png" width="750" alt=""/>
@@ -119,6 +119,6 @@ To set up the project, follow these steps:
 
 To run the application, use the following commands:
    ```sh
-      cd src
-      streamlit run orchestrator.py
+   cd src
+   streamlit run orchestrator.py
    ```
