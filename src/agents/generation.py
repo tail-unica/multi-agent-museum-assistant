@@ -60,7 +60,7 @@ class Generator():
         # Join all document contents into a single context string
         return "\n\n".join(context_parts)
 
-    def get_answer(self, question):
+    def get_answer(self, question, last_message=""):
         results, metadata = None, None
         if self.retriever.retriever.__class__.__name__ != "VectorStoreRetriever":
             self.retriever.retriever = self.retriever.retriever.as_retriever()
@@ -85,10 +85,10 @@ class Generator():
             if results[0][1] > 0.55:
                 metadata = None
 
-        input_data = {"context": context, "question": question}
+        input_data = {"context": context, "question": question, "history": last_message}
 
         after_rag_chain = (
-                {"context": RunnablePassthrough(), "question": RunnablePassthrough()}
+                {"context": RunnablePassthrough(), "question": RunnablePassthrough(), "history": RunnablePassthrough()}
                 | after_rag_prompt
                 | self.model_local
                 | StrOutputParser()
@@ -128,12 +128,12 @@ class Generator():
 
         self.after_rag_template = """You are a local guide at the CIMA museum, and it is your duty to provide enjoyable and complete answers to the visitors, using only words that are easy to understand.
             Answer the question based only on the following context:
-        {context}. If the question does not match the context, just say that it is not related to the museum. Avoid hallucinating or inventing/mention anything that is not related to the context.
-        Otherwise, provide insightful answers, using only information's matching both the context and the question. Do not mention the documents you read, just say all you know as if it was your knowledge.
-        Answer only the question, avoiding inappropriate or useless addictions to the answer. 
+        {context} and the last message you wrote {history}. If the question does not match the context, just say that it is not related to the museum. Avoid hallucinating or inventing/mention anything that is not related to the context.
+        Otherwise, provide insightful answers, using only information's matching the context, the eventual history and the question. Do not mention the documents you read, just say all you know as if it was your knowledge.
+        Answer only the question, avoiding inappropriate or useless addictions to the answer. If the user tells something about the last message you wrote, try to understand what he is asking about.
         """ + customization + """
         Question: {question}
-        Opera and musical works are not part of the museum, so avoid talking about them.
+        Opera and musical works are not part of the museum, so do not talk about them.
         The museum is open and full of sardinian history operas. If an user asks about opening times for the museum, just say the opening times and no more.
         Remember that the visitor is already inside the museum, so try to suggest other operas inside it (while mentioning their location), but only among the ones mentioned in the provided context.
         """
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     add_logo()
     if 'orchestrator' in st.session_state:
 
-
+        last_answer = None
         st.title(init_questions[st.session_state['language']]["title"])
 
         # Initialize chat history
@@ -211,17 +211,6 @@ if __name__ == "__main__":
         transcription = None
 
         audio_file = None #add_audio_input() #st.audio_input("Record a voice message")
-        if audio_file is not None:
-            pass
-            #st.audio(audio_file, format="audio/wav")
-            #with open("temp_audio.wav", "wb") as f:
-            #    f.write(audio_file.getbuffer())
-
-            #model = whisper.load_model("small", device="cuda:0")
-            #transcription = model.transcribe("temp_audio.wav", language=cfg.languages[st.session_state['language']], patience=2, beam_size=5)
-            #del model
-            #torch.cuda.empty_cache()  # Clear unused GPU memory
-            #gc.collect()
 
         if not st.session_state['cheered']:
             welcome_message = "Welcome to the CIMA museum in Allai! :) How can I help  you?"
@@ -251,7 +240,8 @@ if __name__ == "__main__":
 
             #print(prompt)
             with st.spinner(init_questions[st.session_state['language']]["think"]):
-                response, metadata = st.session_state['orchestrator'].generator.get_answer(str(prompt))
+
+                response, metadata = st.session_state['orchestrator'].generator.get_answer(str(prompt), last_answer if last_answer else "None")
             #print(metadata)
             # Regular expression to remove everything between <think> and </think>
             cleaned_text = re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL)
@@ -263,6 +253,8 @@ if __name__ == "__main__":
             response = response.replace("Mениh", "menhir")
             response = response.replace("mhenry", "menhir")
             response = response.replace("betylr", "betile")
+
+            last_answer = response
 
             if st.session_state['language'] != "English":
                 #with st.spinner(init_questions[st.session_state['language']]["translating"]):
@@ -294,7 +286,8 @@ if __name__ == "__main__":
             # Add assistant response to chat history
             st.session_state.messages.append({"role": "assistant", "content": response})
 
-            with open(f"chat_history_{st.session_state.session_id}.json", "w") as f:
+
+            with open(f"../chats_history_{st.session_state.session_id}.json", "w") as f:
                 json.dump(st.session_state.messages, f, indent=4)
 
             torch.cuda.empty_cache()  # Clear unused GPU memory
