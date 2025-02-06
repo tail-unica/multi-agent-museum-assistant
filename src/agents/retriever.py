@@ -130,7 +130,7 @@ class Retriever():
         chromadb.api.client.SharedSystemClient.clear_system_cache()
 
         client = chromadb.PersistentClient(path=cfg.chroma_db_config["path"])
-        collection = client.get_or_create_collection(name="rag-chroma-json")
+        collection = client.get_or_create_collection(name="rag-chroma-json", metadata={"hnsw:space": "cosine"})
 
         start = time.time()
         if os.path.exists(cfg.chroma_db_config["path"]) and os.path.isdir(cfg.chroma_db_config["path"]) and len(
@@ -159,8 +159,10 @@ class Retriever():
         vectorstore = Chroma(persist_directory=cfg.chroma_db_config["path"],
                              embedding_function=embeddings.OllamaEmbeddings(model=self.embedding_model),
                              collection_name=collection.name,
-                             client=client)
+                             client=client,
+                             )
 
+        #print(F"Chroma is using {vectorstore.metadata}")
         '''
         vectorstore = Chroma.from_documents(
             client=client,

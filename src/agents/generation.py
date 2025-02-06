@@ -39,6 +39,16 @@ class Generator():
         Question: {question}
         """
 
+    def format_context(self, results, max_docs=5):
+        # Limit to top N documents (optional)
+        filtered_results = results[:max_docs]
+
+        # Format the context by extracting document content
+        context_parts = [f"Document {i + 1}: {doc.page_content.strip()}" for i, (doc, score) in
+                         enumerate(filtered_results)]
+
+        # Join all document contents into a single context string
+        return "\n\n".join(context_parts)
 
     def get_answer(self, question):
         results, metadata = None, None
@@ -48,21 +58,30 @@ class Generator():
         after_rag_prompt = ChatPromptTemplate.from_template(self.after_rag_template)
         print(f"Prompt: {after_rag_prompt}")
 
+        results = self.retriever.retriever.vectorstore.similarity_search_with_score(question)
+        scores = [ans[1] for ans in results]
+        print(f"Retrieved scores: {scores}")
+        cleared_ = [ans for ans in results if ans[1] < 0.5]
+        context = self.format_context(cleared_)
+
+        # print(results)
+        if results:
+            metadata = results[0][0].metadata
+            if results[0][1] > 0.5:
+                metadata = None
+
+        input_data = {"context": context, "question": question}
+
         after_rag_chain = (
-                {"context": self.retriever.retriever, "question": RunnablePassthrough()}
+                {"context": RunnablePassthrough(), "question": RunnablePassthrough()}
                 | after_rag_prompt
                 | self.model_local
                 | StrOutputParser()
         )
 
-        results = self.retriever.retriever.vectorstore.similarity_search_with_score(question)
-        #print(results)
-        if results:
-            metadata = results[0][0].metadata
-            if results[0][1] > 750:
-                metadata = None
 
-        return after_rag_chain.invoke(question), metadata
+
+        return after_rag_chain.invoke(input_data), metadata
 
     def format_history(self, history):
         if history == "None":
