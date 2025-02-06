@@ -1,9 +1,11 @@
 import copy
 import gc
+import json
 import os
 import re
 import time
 import deepl
+import numpy as np
 import requests
 import torch
 from gtts import gTTS
@@ -12,6 +14,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 import streamlit as st
+from langchain_community import embeddings
+
 from init_questions_multilanguage import init_questions
 from src.api import api_key
 from src.config import config as cfg
@@ -39,6 +43,12 @@ class Generator():
         Question: {question}
         """
 
+    def normalize_vector(self, vector):
+        norm = np.linalg.norm(vector)
+        if norm == 0:
+            return vector  # Handle edge case for zero vector
+        return vector / norm
+
     def format_context(self, results, max_docs=5):
         # Limit to top N documents (optional)
         filtered_results = results[:max_docs]
@@ -58,16 +68,21 @@ class Generator():
         after_rag_prompt = ChatPromptTemplate.from_template(self.after_rag_template)
         print(f"Prompt: {after_rag_prompt}")
 
+        #query_embedding = embeddings.OllamaEmbeddings(model="bge-m3").embed_query(question)
+        #normalized_query_embedding = self.normalize_vector(query_embedding)
+
         results = self.retriever.retriever.vectorstore.similarity_search_with_score(question)
+
         scores = [ans[1] for ans in results]
         print(f"Retrieved scores: {scores}")
-        cleared_ = [ans for ans in results if ans[1] < 0.5]
+        cleared_ = [ans for ans in results if ans[1] < 0.55]
         context = self.format_context(cleared_)
+        print("Context: ", context)
 
         # print(results)
         if results:
             metadata = results[0][0].metadata
-            if results[0][1] > 0.5:
+            if results[0][1] > 0.55:
                 metadata = None
 
         input_data = {"context": context, "question": question}
@@ -180,6 +195,7 @@ if __name__ == "__main__":
     add_logo()
     if 'orchestrator' in st.session_state:
 
+
         st.title(init_questions[st.session_state['language']]["title"])
 
         # Initialize chat history
@@ -277,6 +293,9 @@ if __name__ == "__main__":
 
             # Add assistant response to chat history
             st.session_state.messages.append({"role": "assistant", "content": response})
+
+            with open(f"chat_history_{st.session_state.session_id}.json", "w") as f:
+                json.dump(st.session_state.messages, f, indent=4)
 
             torch.cuda.empty_cache()  # Clear unused GPU memory
             gc.collect()

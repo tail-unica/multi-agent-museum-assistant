@@ -2,14 +2,14 @@ import copy
 import json
 import os
 import time
-
+import numpy as np
 import requests
 import streamlit as st
 import deepl
 import torch
 from langchain_community.document_loaders import WebBaseLoader # for web documents
 from langchain_community.document_loaders import PyPDFLoader # for local documents
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma, InMemoryVectorStore
 from langchain_community import embeddings
 import chromadb
 import locale
@@ -105,6 +105,13 @@ class Retriever():
             documents.append({"id": record_id, "text": text, "metadata": metadata})
         return documents
 
+    def normalize_vector(self, vector):
+        vector = np.asarray(vector)
+        norm = np.linalg.norm(vector)
+        if norm == 0:
+            return vector.tolist()
+        return (vector / norm).tolist()
+
     # Insert data into ChromaDB
     def insert_into_chromadb(self, collection, documents, embedding_function):
         for doc in documents:
@@ -112,6 +119,7 @@ class Retriever():
             if not text.strip():
                 continue  # Skip empty text
             vector = embedding_function.embed_query(text)
+            #vector = self.normalize_vector(vector)
             collection.add(
                 ids=[doc["id"]],
                 metadatas=[doc["metadata"]],
@@ -122,9 +130,7 @@ class Retriever():
 
 
     def _init_retriever(self, force_reload=False):
-        #if self.language == "it":
-        #    cfg.chroma_db_config["path"] = f"{cfg.chroma_db_config['path']}_it"
-        #else:
+
         cfg.chroma_db_config["path"] = f"{cfg.chroma_db_config['path']}_en"
 
         chromadb.api.client.SharedSystemClient.clear_system_cache()
@@ -139,12 +145,7 @@ class Retriever():
             print(f"Loading {cfg.chroma_db_config['path']} chroma database in {time.time() - start} seconds")
         else:
 
-            #web_documents = self._load_web_documents(urls=self.urls)
-            #local_documents = self._load_local_documents(document_root=self.document_root)
-            self.document_db = self.load_json_files(cfg.local_json) #web_documents + local_documents
-
-            #text_splitter = CharacterTextSplitter.from_tiktoken_encoder(chunk_size=1024, chunk_overlap=100)
-            #doc_splits = text_splitter.split_documents(self.document_db)
+            self.document_db = self.load_json_files(cfg.local_json)
 
             all_documents = []
             for json_data in self.document_db:
@@ -162,7 +163,7 @@ class Retriever():
                              client=client,
                              )
 
-        #print(F"Chroma is using {vectorstore.metadata}")
+        print("Chroma")
         '''
         vectorstore = Chroma.from_documents(
             client=client,

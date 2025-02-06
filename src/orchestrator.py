@@ -1,5 +1,7 @@
 import os
 import sys
+import uuid
+
 sys.path.append('src/agents')
 from init_questions_multilanguage import init_questions
 from src.agents.retriever import Retriever
@@ -37,6 +39,10 @@ def load_orchestrator(session_state):
 
 
 def start_session(session_state):
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+        st.session_state.messages = []
+
     session_state['knowledge'] = ""
     session_state['age'] = ""
 
@@ -47,7 +53,7 @@ def start_session(session_state):
 
     session_state['language'] = option
     #st.write("You selected:", option)
-
+    os.makedirs("../chats_history", exist_ok=True)
     # orchestrator = Orchestrator()
 
     if st.button(init_questions[st.session_state['language']]["send_data"]):
